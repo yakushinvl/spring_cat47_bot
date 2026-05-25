@@ -1,0 +1,126 @@
+const { Keyboard } = require('@maxhub/max-bot-api');
+const { pool, ...db } = require('./db');
+const ui = require('./menus');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+
+const yaml = require('js-yaml');
+const config = yaml.load(fs.readFileSync(path.join(__dirname, '../config.yaml'), 'utf8'));
+
+function getNextWorkDay(date, daysOffset) {
+    let d = new Date(date);
+    d.setDate(d.getDate() + daysOffset);
+    const dayMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    while (!config.organization.working_hours[dayMap[d.getDay()]]) {
+        d.setDate(d.getDate() + 1);
+    }
+    return d;
+}
+
+const referralFlow = {
+    async start(ctx, refCode = null) {
+        const userId = ctx.user.user_id;
+        let existingData = {};
+        let code = refCode;
+
+        if (refCode) {
+            const res = await pool.query('SELECT * FROM referral_links WHERE code = $1', [refCode]);
+            const ref = res.rows[0];
+            if (ref) {
+                existingData = {
+                    comment: ref.comment,
+                    visit_date: ref.visit_date ? ref.visit_date.toISOString().split('T')[0] : null,
+                    visit_time: ref.visit_time,
+                    zone: ref.zone,
+                    purpose: ref.purpose
+                };
+            }
+        } else {
+            code = crypto.randomBytes(4).toString('hex');
+        }
+        
+        await db.setState(userId, { 
+            step: 'awaiting_ref_comment', 
+            data: { ...existingData, code, isEditing: !!refCode } 
+        });
+
+        const promptText = refCode ? `Настройка ссылки \`${refCode}\`\n(Текущий коммент: ${existingData.comment || 'нет'})\n\n${ui.settings.refStepComment}` : ui.settings.refStepComment;
+        
+        await ctx.sendOrEdit(promptText, { 
+            format: 'markdown',
+            attachments: [Keyboard.inlineKeyboard([[Keyboard.button.callback('Отмена', 'referral_links')]])] 
+        });
+    },
+
+    async askDate(ctx) {
+        const today = new Date();
+        const minDays = config.organization.min_days_before_visit;
+        const dates = [
+            getNextWorkDay(today, minDays),
+            getNextWorkDay(today, minDays + 3),
+            getNextWorkDay(today, minDays + 7)
+        ];
+
+        const buttons = dates.map(d => [Keyboard.button.callback(d.toLocaleDateString('ru-RU'), `ref_set_date:${d.toISOString().split('T')[0]}`)]);
+        
+        await ctx.sendOrEdit(ui.settings.refStepDate, { attachments: [ui.application.cancelKeyboard(buttons)] });
+    },
+
+    async askTime(ctx, dateStr) {
+        let rows = [];
+        if (dateStr !== '0') {
+            const dayMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+            const d = new Date(dateStr);
+            const hours = config.organization.working_hours[dayMap[d.getDay()]];
+            
+            if (hours) {
+                const [hStart, mStart] = hours.start.split(':').map(Number);
+                const [hEnd, mEnd] = hours.end.split(':').map(Number);
+                const slots = [];
+                let cur = new Date(); cur.setHours(hStart, mStart, 0, 0);
+                let end = new Date(); end.setHours(hEnd, mEnd, 0, 0);
+
+                while (cur < end) {
+                    const time = cur.toTimeString().substring(0, 5);
+                    slots.push(Keyboard.button.callback(time, `ref_set_time:${time}`));
+                    cur.setMinutes(cur.getMinutes() + 30);
+                }
+                for (let i = 0; i < slots.length; i += 4) rows.push(slots.slice(i, i + 4));
+            }
+        }
+        
+        await ctx.sendOrEdit(ui.settings.refStepTime, { attachments: [ui.application.cancelKeyboard(rows)] });
+    },
+
+    async askZone(ctx) {
+        const zones = config.organization.access_zones;
+        const buttons = zones.map(z => [Keyboard.button.callback(z, `ref_set_zone:${z.substring(0, 30)}`)]);
+        
+        await ctx.sendOrEdit(ui.settings.refStepZone, { attachments: [ui.application.cancelKeyboard(buttons)] });
+    },
+
+    async askPurpose(ctx) {
+        const kb = Keyboard.inlineKeyboard([
+            [Keyboard.button.callback('Отмена', 'cancel_form')]
+        ]);
+        await ctx.sendOrEdit(ui.settings.refStepPurpose, { attachments: [kb] });
+    },
+
+    async showSummary(ctx, data) {
+        const summary = `Параметры новой ссылки:\n\n` +
+            `Комментарий: ${data.comment}\n` +
+            `Код: \`${data.code}\`\n` +
+            `Дата: ${data.visit_date || 'не выбрана'}\n` +
+            `Время: ${data.visit_time || 'не выбрано'}\n` +
+            `Зона: ${data.zone || 'не выбрана'}\n` +
+            `Цель: ${data.purpose || 'не выбрана'}`;
+            
+        await ctx.sendOrEdit(summary, { 
+            format: 'markdown',
+            attachments: [ui.settings.refSummaryKeyboard] 
+        });
+    }
+};
+
+module.exports = referralFlow;
