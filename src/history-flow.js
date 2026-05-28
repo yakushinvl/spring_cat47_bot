@@ -74,8 +74,13 @@ const historyFlow = {
             if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
             const filePath = path.join(tempDir, fileName);
 
+            const formatDateRU = (iso) => {
+                const [y, m, d] = iso.split('-');
+                return `${d}.${m}.${y}`;
+            };
+
             const content = `ОТЧЕТ ПО ИСТОРИИ ДЕЙСТВИЙ БОТА\n` +
-                `Период: ${start} — ${end}\n` +
+                `Период: ${formatDateRU(start)} — ${formatDateRU(end)}\n` +
                 `Всего действий за период: ${logs.length}\n` +
                 `Сформировано: ${new Date().toLocaleString('ru-RU')}\n\n` + 
                 logs.map(l => {

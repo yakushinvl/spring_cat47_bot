@@ -81,7 +81,14 @@ const ui = {
     admin: {
         listTitle: (from, to, total) => `Показаны заявки ${from}-${to} из ${total}:`,
         noApps: 'Новых заявок пока нет.',
-        item: (app) => `Заявка #${app.id}\nФИО: ${app.guest_name}\nДата: ${formatDateRU(app.visit_date)}\nСтатус: ${app.status}` + (app.comment ? `\nКомментарий: ${app.comment}` : ''),
+        item: (app) => `Заявка #${app.id}\n` +
+            `ФИО гостя: ${app.guest_name}\n` +
+            `Дата визита: ${formatDateRU(app.visit_date)}\n` +
+            `Время визита: ${app.visit_time || 'не указано'}\n` +
+            `Зона доступа: ${app.zone || 'не указана'}\n` +
+            `Цель визита: ${app.purpose || 'не указана'}\n` +
+            `Статус: *${app.status.toUpperCase()}*` + 
+            (app.comment ? `\nКомментарий: ${app.comment}` : ''),
         searchPrompt: 'Введите номер заявки для поиска:',
         searchButton: 'Найти по номеру',
         
@@ -99,7 +106,12 @@ const ui = {
 
         correctionPrompt: 'Что именно нужно уточнить? Введите текст сообщения для пользователя:',
         
-        newAppNotification: (app) => `Новая заявка #${app.id}!\nФИО: ${app.guest_name}\nДата: ${formatDateRU(app.visit_date)}\nЗона: ${app.zone}\nЦель: ${app.purpose || 'не указана'}`,
+        newAppNotification: (app) => `Новая заявка #${app.id}!\n` +
+            `ФИО: ${app.guest_name}\n` +
+            `Дата: ${formatDateRU(app.visit_date)}\n` +
+            `Время: ${app.visit_time || 'не указано'}\n` +
+            `Зона: ${app.zone}\n` +
+            `Цель: ${app.purpose || 'не указана'}`,
         notificationKeyboard: (appId) => Keyboard.inlineKeyboard([[Keyboard.button.callback('Изменить статус', `view_app:${appId}`)]]),
 
         paginationKeyboard: (offset, total, role = 'admin') => {
@@ -182,7 +194,14 @@ const ui = {
     myApplications: {
         title: (from, to, total) => `Показаны ваши заявки ${from}-${to} из ${total}:`,
         empty: 'У вас пока нет поданных заявок.',
-        item: (app) => `Заявка #${app.id}\nГость: ${app.guest_name}\nДата: ${formatDateRU(app.visit_date)}\nСтатус: *${app.status}*` + (app.comment ? `\nКомментарий: ${app.comment}` : ''),
+        item: (app) => `Заявка #${app.id}\n` +
+            `Гость: ${app.guest_name}\n` +
+            `Дата: ${formatDateRU(app.visit_date)}\n` +
+            `Время: ${app.visit_time || 'не указано'}\n` +
+            `Зона: ${app.zone || 'не указана'}\n` +
+            `Цель: ${app.purpose || 'не указана'}\n` +
+            `Статус: *${app.status.toUpperCase()}*` + 
+            (app.comment ? `\nКомментарий: ${app.comment}` : ''),
         cancelButton: (id) => `Отменить #${id}`,
         refillButton: (id) => `Перезаполнить #${id}`,
         cancelCallback: (id) => `cancel_app:${id}`,
