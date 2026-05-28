@@ -93,7 +93,7 @@ module.exports = {
         return res.rows.length > 0 ? res.rows[0].current_state : null;
     },
     async getTemplates(userId) {
-        const res = await pool.query('SELECT id, full_name FROM guest_templates WHERE user_id = $1 ORDER BY full_name ', [userId]);
+        const res = await pool.query('SELECT id, full_name FROM guest_templates WHERE user_id = $1 ORDER BY full_name ASC', [userId]);
         return res.rows;
     },
     async isTemplateExists(userId, fullName) {
@@ -126,9 +126,57 @@ module.exports = {
         );
         return parseInt(res.rows[0].count);
     },
-    async getPendingApplications() {
-        const res = await pool.query('SELECT * FROM applications WHERE status = \'на рассмотрении\' ORDER BY created_at');
-        return res.rows;
+    async autoRejectExpiredApplications() {
+        const query = `
+            UPDATE applications 
+            SET status = 'отклонена', comment = 'Автоматическое отклонение: дата или время визита прошли'
+            WHERE status IN ('на рассмотрении', 'требует корректировки', 'черновик')
+            AND (
+                visit_date < CURRENT_DATE 
+                OR (visit_date = CURRENT_DATE AND visit_time < CURRENT_TIME)
+            )
+        `;
+        const res = await pool.query(query);
+        return res.rowCount;
+    },
+    async autoExpireReferralLinks() {
+        const query = `
+            UPDATE referral_links 
+            SET status = 'просрочена'
+            WHERE status IN ('активна', 'черновик')
+            AND visit_date IS NOT NULL
+            AND (
+                visit_date < CURRENT_DATE 
+                OR (visit_date = CURRENT_DATE AND visit_time < CURRENT_TIME)
+            )
+        `;
+        const res = await pool.query(query);
+        return res.rowCount;
+    },
+    async getUserApplications(userId, limit = 5, offset = 0) {
+        const query = `
+            SELECT * FROM (
+                SELECT * FROM applications 
+                WHERE initiator_id = $1 
+                ORDER BY created_at DESC, id DESC 
+                LIMIT $2 OFFSET $3
+            ) AS sub
+            ORDER BY created_at ASC, id ASC
+        `;
+        const res = await pool.query(query, [userId, limit, offset]);
+        const countRes = await pool.query('SELECT COUNT(*) FROM applications WHERE initiator_id = $1', [userId]);
+        return { items: res.rows, total: parseInt(countRes.rows[0].count) };
+    },
+    async getPendingApplications(limit = 5, offset = 0) {
+        const query = `
+            SELECT * FROM applications 
+            WHERE status = 'на рассмотрении' 
+            ORDER BY created_at DESC, id DESC 
+            LIMIT $1 OFFSET $2
+        `;
+        const res = await pool.query(query, [limit, offset]);
+        const countRes = await pool.query('SELECT COUNT(*) FROM applications WHERE status = \'на рассмотрении\'');
+        return { items: res.rows, total: parseInt(countRes.rows[0].count) };
     },
     async getApplicationById(id) {
         const res = await pool.query('SELECT * FROM applications WHERE id = $1', [id]);
@@ -149,7 +197,7 @@ module.exports = {
                        COUNT(a.id) FILTER (WHERE a.status = 'отклонена') as rejected
                 FROM periods p
                 LEFT JOIN applications a ON a.created_at >= p.p_start AND a.created_at < (p.p_start + INTERVAL '1 day')
-                GROUP BY p.p_start ORDER BY p.p_start`;
+                GROUP BY p.p_start ORDER BY p.p_start ASC`;
         } else if (period === 'month') {
             query = `
                 WITH month_days AS (
@@ -172,7 +220,7 @@ module.exports = {
                 FROM periods p
                 LEFT JOIN applications a ON a.created_at >= p.p_start AND a.created_at < (p.p_start + INTERVAL '7 days')
                 GROUP BY p.p_start
-                ORDER BY p.p_start`;
+                ORDER BY p.p_start ASC`;
         } else if (period === 'year') {
             query = `
                 WITH periods AS (
@@ -187,7 +235,7 @@ module.exports = {
                        COUNT(a.id) FILTER (WHERE a.status = 'отклонена') as rejected
                 FROM periods p
                 LEFT JOIN applications a ON a.created_at >= p.p_start AND a.created_at < (p.p_start + INTERVAL '1 month')
-                GROUP BY p.p_start ORDER BY p.p_start`;
+                GROUP BY p.p_start ORDER BY p.p_start ASC`;
         }
         const res = await pool.query(query);
         return res.rows;
@@ -197,7 +245,7 @@ module.exports = {
     },
     async getHistory(dateStart, dateEnd, isTechAdmin = false) {
         const res = await pool.query(
-            'SELECT * FROM action_history WHERE created_at >= $1 AND created_at < ($2::date + INTERVAL \'1 day\') ORDER BY created_at',
+            'SELECT * FROM action_history WHERE created_at >= $1 AND created_at < ($2::date + INTERVAL \'1 day\') ORDER BY created_at ASC',
             [dateStart, dateEnd]
         );
         if (isTechAdmin) {
@@ -215,15 +263,8 @@ module.exports = {
     async updateUserRole(userId, newRole) {
         await pool.query('UPDATE users SET role = $1 WHERE user_id = $2', [newRole, userId]);
     },
-    async getUserApplications(userId) {
-        const res = await pool.query(
-            'SELECT * FROM applications WHERE initiator_id = $1 ORDER BY created_at DESC LIMIT 10',
-            [userId]
-        );
-        return res.rows;
-    },
     async getReferralLink(code) {
-        const res = await pool.query('SELECT * FROM referral_links WHERE code = $1 AND status = \'активна\'', [code]);
+        const res = await pool.query('SELECT * FROM referral_links WHERE code = $1', [code]);
         return res.rows[0];
     },
     async createReferralLink(code, data, status = 'активна') {

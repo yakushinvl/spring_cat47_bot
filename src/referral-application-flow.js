@@ -37,6 +37,11 @@ const refAppFlow = {
             buttons.unshift([Keyboard.button.callback(`Предложено: ${refD.toLocaleDateString('ru-RU')}`, `refapp_set_date:${state.data.ref_date}`)]);
         }
 
+        if (state?.data?.visit_date) {
+            const curD = new Date(state.data.visit_date);
+            buttons.unshift(ui.application.currentValueButton(curD.toLocaleDateString('ru-RU'), 'Оставить дату'));
+        }
+
         await ctx.sendOrEdit(ui.application.date, { attachments: [ui.application.cancelKeyboard(buttons)] });
     },
 
@@ -63,8 +68,13 @@ const refAppFlow = {
         
         const rows = [];
         if (state?.data?.ref_time) {
-            rows.push([Keyboard.button.callback(`🔹 Предложено: ${state.data.ref_time}`, `refapp_set_time:${state.data.ref_time}`)]);
+            rows.push([Keyboard.button.callback(`Предложено: ${state.data.ref_time}`, `refapp_set_time:${state.data.ref_time}`)]);
         }
+
+        if (state?.data?.visit_time) {
+            rows.unshift(ui.application.currentValueButton(state.data.visit_time.substring(0, 5), 'Оставить время'));
+        }
+
         for (let i = 0; i < slots.length; i += 4) rows.push(slots.slice(i, i + 4));
 
         await ctx.sendOrEdit(ui.application.time, { attachments: [ui.application.cancelKeyboard(rows)] });
@@ -77,7 +87,11 @@ const refAppFlow = {
         const buttons = zones.map(z => [Keyboard.button.callback(z, `refapp_set_zone:${z.substring(0, 30)}`)]);
         
         if (state?.data?.ref_zone) {
-            buttons.unshift([Keyboard.button.callback(`🔹 Предложено: ${state.data.ref_zone}`, `refapp_set_zone:${state.data.ref_zone.substring(0, 30)}`)]);
+            buttons.unshift([Keyboard.button.callback(`Предложено: ${state.data.ref_zone}`, `refapp_set_zone:${state.data.ref_zone.substring(0, 30)}`)]);
+        }
+
+        if (state?.data?.zone) {
+            buttons.unshift(ui.application.currentValueButton(state.data.zone, 'Оставить зону'));
         }
 
         await ctx.sendOrEdit(ui.application.zone, { attachments: [ui.application.cancelKeyboard(buttons)] });
@@ -86,16 +100,17 @@ const refAppFlow = {
     async askPurpose(ctx) {
         const userId = ctx.user.user_id;
         const state = await db.getState(userId);
+        const buttons = [];
         
         if (state?.data?.ref_purpose) {
-            const kb = Keyboard.inlineKeyboard([
-                [Keyboard.button.callback(`🔹 Предложено: ${state.data.ref_purpose}`, `refapp_set_purpose:${state.data.ref_purpose.substring(0, 30)}`)],
-                [Keyboard.button.callback('Отмена', 'cancel_form')]
-            ]);
-            await ctx.sendOrEdit(ui.application.purpose, { attachments: [kb] });
-        } else {
-            await ctx.sendOrEdit(ui.application.purpose, { attachments: [] });
+            buttons.push([Keyboard.button.callback(`Предложено: ${state.data.ref_purpose}`, `refapp_set_purpose:${state.data.ref_purpose.substring(0, 30)}`)]);
         }
+
+        if (state?.data?.purpose) {
+            buttons.unshift(ui.application.currentValueButton(state.data.purpose, 'Оставить цель'));
+        }
+
+        await ctx.sendOrEdit(ui.application.purpose, { attachments: [ui.application.cancelKeyboard(buttons)] });
     }
 };
 

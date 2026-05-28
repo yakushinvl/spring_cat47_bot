@@ -5,11 +5,11 @@ const ui = {
     menus: {
         'Инициатор': Keyboard.inlineKeyboard([
             [Keyboard.button.callback('Подать заявку', 'apply')],
-            [Keyboard.button.callback('Мои заявки', 'my_applications')],
+            [Keyboard.button.callback('Мои заявки', 'user_list:0')],
             [Keyboard.button.callback('Мои данные', 'my_data')]
         ]),
         'Администратор': Keyboard.inlineKeyboard([
-            [Keyboard.button.callback('Все заявки', 'all_applications')]
+            [Keyboard.button.callback('Полученные заявки', 'admin_list:0')]
         ]),
         'Технический администратор': Keyboard.inlineKeyboard([
             [Keyboard.button.callback('Статистика', 'stats')],
@@ -20,7 +20,7 @@ const ui = {
 
     // --- СОГЛАСИЕ ОПД ---
     consent: {
-        disclaimer: 'Данный сервис разработан командой «Вобла» в рамках университетского хакатона. Он не является официальной функцией платформы MAX.',
+        disclaimer: '*Дисклеймер*: Данный сервис разработан командой «Вобла» в рамках университетского хакатона. Он не является официальной функцией платформы MAX.',
         text: 'Чтобы пользоваться сервисом «Электронное бюро пропусков», необходимо ваше согласие на обработку ID профиля и имени для формирования списка заявок и обратной связи.',
         updateText: 'Мы обновили условия использования или версию документов. Пожалуйста, подтвердите согласие повторно для продолжения работы:',
         keyboard: Keyboard.inlineKeyboard([
@@ -31,12 +31,14 @@ const ui = {
     // --- ФОРМА ПОДАЧИ ЗАЯВКИ ---
     application: {
         guestName: 'Введите ФИО или выберите из сохраненных:',
-        date: 'Выберите дату визита или введите в формате ГГГГ-ММ-ДД:',
+        date: 'Введите дату визита в формате ДД.ММ.ГГГГ (или ДД.ММ / ДД.ММ.ГГ) или выберите из предложенных:',
         time: 'Выберите время визита:',
         zone: 'Выберите зону доступа:',
         purpose: 'Введите цель визита:',
         limitExceeded: 'Вы не можете подать новую заявку. У вас уже есть 3 активные заявки (на рассмотрении или требующие корректировки).',
         
+        currentValueButton: (val, label = 'Текущее значение') => [Keyboard.button.callback(`${label}: ${val}`, `keep_value`)],
+
         // Кнопки отмены (общие для шагов)
         cancelKeyboard: (buttons = []) => Keyboard.inlineKeyboard([
             ...buttons,
@@ -67,7 +69,7 @@ const ui = {
 
     // --- АДМИН-ПАНЕЛЬ (Инженер ИБ) ---
     admin: {
-        listTitle: 'Список активных заявок:',
+        listTitle: (from, to, total) => `Показаны заявки ${from}-${to} из ${total}:`,
         noApps: 'Новых заявок пока нет.',
         item: (app) => `Заявка #${app.id}\nФИО: ${app.guest_name}\nДата: ${app.visit_date.toLocaleDateString('ru-RU')}\nСтатус: ${app.status}` + (app.comment ? `\nКомментарий: ${app.comment}` : ''),
         searchPrompt: 'Введите номер заявки для поиска:',
@@ -87,8 +89,19 @@ const ui = {
 
         correctionPrompt: 'Что именно нужно уточнить? Введите текст сообщения для пользователя:',
         
-        // Уведомления
-        newAppNotification: (app) => `Новая заявка #${app.id}!\nФИО: ${app.guest_name}\nДата: ${app.visit_date.toLocaleDateString('ru-RU')}\nЗона: ${app.zone}`
+        newAppNotification: (app) => `Новая заявка #${app.id}!\nФИО: ${app.guest_name}\nДата: ${app.visit_date.toLocaleDateString('ru-RU')}\nЗона: ${app.zone}\nЦель: ${app.purpose || 'не указана'}`,
+        notificationKeyboard: (appId) => Keyboard.inlineKeyboard([[Keyboard.button.callback('Изменить статус', `view_app:${appId}`)]]),
+
+        paginationKeyboard: (offset, total, role = 'admin') => {
+            const btns = [];
+            const row = [];
+            if (offset > 0) row.push(Keyboard.button.callback('Показать предыдущие 5', `${role}_list:${offset - 5}`));
+            if (offset + 5 < total) row.push(Keyboard.button.callback('Показать следующие 5', `${role}_list:${offset + 5}`));
+            if (row.length > 0) btns.push(row);
+            btns.push([Keyboard.button.callback('Найти по номеру', 'search_app')]);
+            btns.push([Keyboard.button.callback('В меню', 'main_menu')]);
+            return Keyboard.inlineKeyboard(btns);
+        }
     },
 
     // --- СТАТИСТИКА ---
@@ -132,42 +145,53 @@ const ui = {
             [Keyboard.button.callback(`С начала месяца (${month})`, `history_preset:${month}`)],
             [Keyboard.button.callback('Назад', 'main_menu')]
         ]),
-referralTitle: 'Управление Referral-ссылками:',
-referralEmpty: 'Ссылок пока нет.',
-referralItem: (link) => `Комментарий: *${link.comment || 'нет'}\nКод: \`${link.code}\`\nДата: ${link.visit_date ? link.visit_date.toLocaleDateString('ru-RU') : 'не задана'}\nВремя: ${link.visit_time || 'не задано'}\nЗона: ${link.zone || 'не задана'}\nЦель: ${link.purpose || 'не задана'}\nСтатус: *${link.status}*`,
-deleteReferralCallback: (code) => `del_ref:${code}`,
-editReferralCallback: (code) => `edit_ref:${code}`,
-createReferralButton: 'Создать ссылку',
-finishDraftButton: 'Продолжить настройку',
+        referralTitle: 'Управление Referral-ссылками:',
+        referralEmpty: 'Ссылок пока нет.',
+        referralItem: (link) => `Комментарий: *${link.comment || 'нет'}*\nКод: \`${link.code}\` (https://max.ru/spring_cat47_bot?start=\`${link.code}\`)\nДата: ${link.visit_date ? link.visit_date.toLocaleDateString('ru-RU') : 'не задана'}\nВремя: ${link.visit_time || 'не задано'}\nЗона: ${link.zone || 'не задана'}\nЦель: ${link.purpose || 'не задана'}\nСтатус: *${link.status}*`,
+        deleteReferralCallback: (code) => `del_ref:${code}`,
+        editReferralCallback: (code) => `edit_ref:${code}`,
+        createReferralButton: 'Создать ссылку',
+        finishDraftButton: 'Продолжить настройку',
 
-// Шаги создания ссылки
-refStepComment: 'Введите описание/комментарий для этой ссылки (чтобы знать, для чего она):',
-refStepDate: 'Выберите дату или введите ГГГГ-ММ-ДД:',
-refStepTime: 'Выберите время:',
-refStepZone: 'Выберите зону доступа:',
-refStepPurpose: 'Введите цель визита:',
-refSkipButton: 'Пропустить (не заполнять)',
-refSummaryTitle: 'Ссылка готова к созданию:',
-refSummaryKeyboard: Keyboard.inlineKeyboard([
-    [Keyboard.button.callback('Сгенерировать ссылку', 'ref_save_final')],
-    [Keyboard.button.callback('Сохранить в черновик', 'ref_save_draft')],
-    [Keyboard.button.callback('Отмена', 'referral_links')]
-])
-},
+        // Шаги создания ссылки
+        refStepComment: 'Введите описание/комментарий для этой ссылки (чтобы знать, для чего она):',
+        refStepDate: 'Выберите дату или введите ДД.ММ.ГГГГ:',
+        refStepTime: 'Выберите время:',
+        refStepZone: 'Выберите зону доступа:',
+        refStepPurpose: 'Введите цель визита:',
+        refSkipButton: 'Пропустить (не заполнять)',
+        refSummaryTitle: 'Ссылка готова к созданию:',
+        refSummaryKeyboard: Keyboard.inlineKeyboard([
+            [Keyboard.button.callback('Сгенерировать ссылку', 'ref_save_final')],
+            [Keyboard.button.callback('Сохранить в черновик', 'ref_save_draft')],
+            [Keyboard.button.callback('Отмена', 'referral_links')]
+        ])
+    },
 
     // --- МОИ ЗАЯВКИ (Инициатор) ---
     myApplications: {
-        title: 'Ваши последние заявки:',
+        title: (from, to, total) => `Показаны ваши заявки ${from}-${to} из ${total}:`,
         empty: 'У вас пока нет поданных заявок.',
-        item: (app) => `Заявка #${app.id}\nФИО: ${app.guest_name}\nДата: ${app.visit_date.toLocaleDateString('ru-RU')}\nСтатус: *${app.status}*` + (app.comment ? `\nКомментарий: ${app.comment}` : ''),
+        item: (app) => `Заявка #${app.id}\nГость: ${app.guest_name}\nДата: ${app.visit_date.toLocaleDateString('ru-RU')}\nСтатус: *${app.status}*` + (app.comment ? `\nКомментарий: ${app.comment}` : ''),
         cancelButton: (id) => `Отменить #${id}`,
         refillButton: (id) => `Перезаполнить #${id}`,
         cancelCallback: (id) => `cancel_app:${id}`,
         refillCallback: (id) => `refill_app:${id}`,
         backButton: 'Назад',
+
+        paginationKeyboard: (offset, total) => {
+            const btns = [];
+            const row = [];
+            if (offset > 0) row.push(Keyboard.button.callback('Показать предыдущие 5', `user_list:${offset - 5}`));
+            if (offset + 5 < total) row.push(Keyboard.button.callback('Показать следующие 5', `user_list:${offset + 5}`));
+            if (row.length > 0) btns.push(row);
+            btns.push([Keyboard.button.callback('Найти по номеру', 'user_search_app')]);
+            btns.push([Keyboard.button.callback('В меню', 'main_menu')]);
+            return Keyboard.inlineKeyboard(btns);
+        },
         
         // Уведомления
-        statusNotification: (appId, status, comment) => `Статус вашей заявки #${appId} изменен!\nНовый статус: ${status}` + (comment ? `\nКомментарий: ${comment}` : ''),
+        statusNotification: (appId, status, comment) => `Статус вашей заявки #${appId} изменен!\nНовый статус: ${status.toUpperCase()}` + (comment ? `\nКомментарий: ${comment}` : ''),
         refillKeyboard: (appId) => Keyboard.inlineKeyboard([[Keyboard.button.callback(`Перезаполнить #${appId}`, `refill_app:${appId}`)]])
     },
 
@@ -176,7 +200,7 @@ refSummaryKeyboard: Keyboard.inlineKeyboard([
         info: (userId, role) => {
             let text = `Ваш ID: \`${userId}\``;
             if (role !== 'Инициатор') {
-                text += `\n👤 Роль: *${role}*`;
+                text += `\nРоль: *${role}*`;
             }
             return text;
         },
@@ -185,7 +209,7 @@ refSummaryKeyboard: Keyboard.inlineKeyboard([
         deleteTemplateCallback: (id) => `del_tpl:${id}`,
         deleteButton: (name) => `Удалить "${name}"`,
         deleteDataButton: 'Удалить все мои данные',
-        deleteDataConfirmTitle: 'Это действие полностью удалит ваш профиль, все ваши заявки и шаблоны. Вы больше не сможете пользоваться ботом без повторного принятия согласия.\n\nВы уверены?',
+        deleteDataConfirmTitle: 'ВНИМАНИЕ!\n\nЭто действие полностью удалит ваш профиль, все ваши заявки и шаблоны. Восстановление невозможно.\n\nВы уверены?',
         deleteDataConfirmKeyboard: Keyboard.inlineKeyboard([
             [Keyboard.button.callback('Да, удалить всё', 'execute_delete_data')],
             [Keyboard.button.callback('Нет, отмена', 'my_data')]
