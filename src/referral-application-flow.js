@@ -7,10 +7,18 @@ const path = require('path');
 const yaml = require('js-yaml');
 const config = yaml.load(fs.readFileSync(path.join(__dirname, '../config.yaml'), 'utf8'));
 
-/**
- * Логика заполнения заявки ПО РЕФЕРАЛЬНОЙ ССЫЛКЕ.
- * Отличается от обычной тем, что предлагает кнопки на основе данных из ссылки.
- */
+const formatDate = (d) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const parseDate = (isoStr) => {
+    if (!isoStr) return null;
+    const [y, m, d] = isoStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
+};
 
 const refAppFlow = {
     async askDate(ctx, userId) {
@@ -30,15 +38,15 @@ const refAppFlow = {
         }
 
         const state = await db.getState(userId);
-        const buttons = dates.map(d => [Keyboard.button.callback(d.toLocaleDateString('ru-RU'), `refapp_set_date:${d.toISOString().split('T')[0]}`)]);
+        const buttons = dates.map(d => [Keyboard.button.callback(d.toLocaleDateString('ru-RU'), `refapp_set_date:${formatDate(d)}`)]);
         
         if (state?.data?.ref_date) {
-            const refD = new Date(state.data.ref_date);
+            const refD = parseDate(state.data.ref_date);
             buttons.unshift([Keyboard.button.callback(`Предложено: ${refD.toLocaleDateString('ru-RU')}`, `refapp_set_date:${state.data.ref_date}`)]);
         }
 
         if (state?.data?.visit_date) {
-            const curD = new Date(state.data.visit_date);
+            const curD = parseDate(state.data.visit_date);
             buttons.unshift(ui.application.currentValueButton(curD.toLocaleDateString('ru-RU'), 'Оставить дату'));
         }
 
@@ -49,7 +57,7 @@ const refAppFlow = {
         const userId = ctx.user.user_id;
         const state = await db.getState(userId);
         const dayMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-        const d = new Date(dateStr);
+        const d = parseDate(dateStr);
         const hours = config.organization.working_hours[dayMap[d.getDay()]];
         
         if (!hours) return ctx.reply('Организация не работает в этот день.');

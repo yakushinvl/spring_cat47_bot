@@ -16,6 +16,14 @@ const config = yaml.load(fs.readFileSync(path.join(__dirname, 'config.yaml'), 'u
 const bot = new Bot(process.env.BOT_TOKEN);
 const DEBUG = process.env.DEBUG === 'true';
 
+const formatDate = (d) => {
+    if (!d) return null;
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 const processedActions = new Map();
 bot.use(async (ctx, next) => {
     ctx.sendOrEdit = async (text, options = {}) => {
@@ -92,7 +100,7 @@ async function handleStartWithPayload(ctx, payload) {
             data: { 
                 userId,
                 ref_code: payload,
-                ref_date: refLink.visit_date ? refLink.visit_date.toISOString().split('T')[0] : null,
+                ref_date: formatDate(refLink.visit_date),
                 ref_time: refLink.visit_time,
                 ref_zone: refLink.zone,
                 ref_purpose: refLink.purpose

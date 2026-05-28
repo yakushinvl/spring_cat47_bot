@@ -18,6 +18,19 @@ function getNextWorkDay(date, daysOffset) {
     return d;
 }
 
+const formatDate = (d) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const parseDate = (isoStr) => {
+    if (!isoStr) return null;
+    const [y, m, d] = isoStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
+};
+
 const referralFlow = {
     async start(ctx, refCode = null) {
         const userId = ctx.user.user_id;
@@ -32,7 +45,7 @@ const referralFlow = {
                 existingData = {
                     ...existingData,
                     comment: ref.comment,
-                    visit_date: ref.visit_date ? ref.visit_date.toISOString().split('T')[0] : null,
+                    visit_date: ref.visit_date ? formatDate(ref.visit_date) : null,
                     visit_time: ref.visit_time,
                     zone: ref.zone,
                     purpose: ref.purpose
@@ -71,10 +84,10 @@ const referralFlow = {
             getNextWorkDay(today, minDays + 7)
         ];
 
-        const buttons = dates.map(d => [Keyboard.button.callback(d.toLocaleDateString('ru-RU'), `ref_set_date:${d.toISOString().split('T')[0]}`)]);
+        const buttons = dates.map(d => [Keyboard.button.callback(d.toLocaleDateString('ru-RU'), `ref_set_date:${formatDate(d)}`)]);
         
         if (state?.data?.visit_date) {
-            const curD = new Date(state.data.visit_date);
+            const curD = parseDate(state.data.visit_date);
             buttons.unshift(ui.application.currentValueButton(curD.toLocaleDateString('ru-RU'), 'Оставить дату'));
         }
 
@@ -87,7 +100,7 @@ const referralFlow = {
         let rows = [];
         if (dateStr !== '0') {
             const dayMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-            const d = new Date(dateStr);
+            const d = parseDate(dateStr);
             const hours = config.organization.working_hours[dayMap[d.getDay()]];
             
             if (hours) {

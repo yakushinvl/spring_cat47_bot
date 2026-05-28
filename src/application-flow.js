@@ -14,6 +14,13 @@ const getNextWorkDay = (baseDate, days) => {
     return d;
 };
 
+const formatDate = (d) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 const parseRussianDate = (text) => {
     const today = new Date();
     let day, month, year = today.getFullYear();
@@ -37,7 +44,13 @@ const parseRussianDate = (text) => {
     if (!day || month < 1 || month > 12) return null;
     const d = new Date(year, month - 1, day);
     if (isNaN(d.getTime())) return null;
-    return d.toISOString().split('T')[0];
+    return formatDate(d);
+};
+
+const parseDate = (isoStr) => {
+    if (!isoStr) return null;
+    const [y, m, d] = isoStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
 };
 
 const flow = {
@@ -79,15 +92,15 @@ const flow = {
         ];
 
         const state = await db.getState(userId);
-        const buttons = dates.map(d => [Keyboard.button.callback(d.toLocaleDateString('ru-RU'), `set_date:${d.toISOString().split('T')[0]}`)]);
+        const buttons = dates.map(d => [Keyboard.button.callback(d.toLocaleDateString('ru-RU'), `set_date:${formatDate(d)}`)]);
         
         if (state && state.data && state.data.ref_date) {
-            const refD = new Date(state.data.ref_date);
+            const refD = parseDate(state.data.ref_date);
             buttons.unshift([Keyboard.button.callback(`Предложено: ${refD.toLocaleDateString('ru-RU')}`, `set_date:${state.data.ref_date}`)]);
         }
 
         if (state?.data?.visit_date) {
-            const curD = new Date(state.data.visit_date);
+            const curD = parseDate(state.data.visit_date);
             buttons.unshift(ui.application.currentValueButton(curD.toLocaleDateString('ru-RU'), 'Оставить дату'));
         }
 
@@ -98,7 +111,7 @@ const flow = {
         const userId = ctx.user.user_id;
         const state = await db.getState(userId);
         const dayMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-        const d = new Date(dateStr);
+        const d = parseDate(dateStr);
         const hours = config.organization.working_hours[dayMap[d.getDay()]];
         if (!hours) return ctx.reply('Организация не работает в этот день. Выберите другую дату.');
 
