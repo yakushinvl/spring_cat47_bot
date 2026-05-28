@@ -53,6 +53,13 @@ const parseDate = (isoStr) => {
     return new Date(y, m - 1, d);
 };
 
+const formatDateRU = (isoStr) => {
+    if (!isoStr) return 'не указана';
+    if (isoStr.includes('.')) return isoStr;
+    const [y, m, d] = isoStr.split('-').map(Number);
+    return `${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}.${y}`;
+};
+
 const flow = {
     parseRussianDate,
 
@@ -63,7 +70,10 @@ const flow = {
 
         if (appId) {
             const app = await db.getApplicationById(appId);
-            if (app) existingData = { ...app, ...existingData, editingId: appId, userId };
+            if (app) {
+                const visit_date = app.visit_date instanceof Date ? formatDate(app.visit_date) : app.visit_date;
+                existingData = { ...app, visit_date, ...existingData, editingId: appId, userId };
+            }
         }
 
         const templates = await db.getTemplates(userId);
@@ -100,8 +110,8 @@ const flow = {
         }
 
         if (state?.data?.visit_date) {
-            const curD = parseDate(state.data.visit_date);
-            buttons.unshift(ui.application.currentValueButton(curD.toLocaleDateString('ru-RU'), 'Оставить дату'));
+            const displayDate = formatDateRU(state.data.visit_date);
+            buttons.unshift(ui.application.currentValueButton(displayDate, 'Оставить дату'));
         }
 
         await ctx.sendOrEdit(ui.application.date, { attachments: [ui.application.cancelKeyboard(buttons)] });
@@ -175,7 +185,8 @@ const flow = {
     },
 
     async showSummary(ctx, data) {
-        await ctx.sendOrEdit(ui.application.summaryText(data), { 
+        const displayData = { ...data, visit_date: formatDateRU(data.visit_date) };
+        await ctx.sendOrEdit(ui.application.summaryText(displayData), { 
             format: 'markdown',
             attachments: [ui.application.summaryKeyboard] 
         });

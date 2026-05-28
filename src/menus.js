@@ -1,5 +1,15 @@
 const { Keyboard } = require('@maxhub/max-bot-api');
 
+const formatDateRU = (d) => {
+    if (!d) return 'не задана';
+    if (d instanceof Date) return d.toLocaleDateString('ru-RU');
+    if (typeof d === 'string' && d.includes('-')) {
+        const [y, m, day] = d.split('-').map(Number);
+        return `${String(day).padStart(2, '0')}.${String(m).padStart(2, '0')}.${y}`;
+    }
+    return String(d);
+};
+
 const ui = {
     // --- ГЛАВНЫЕ МЕНЮ ПО РОЛЯМ ---
     menus: {
@@ -71,7 +81,7 @@ const ui = {
     admin: {
         listTitle: (from, to, total) => `Показаны заявки ${from}-${to} из ${total}:`,
         noApps: 'Новых заявок пока нет.',
-        item: (app) => `Заявка #${app.id}\nФИО: ${app.guest_name}\nДата: ${app.visit_date.toLocaleDateString('ru-RU')}\nСтатус: ${app.status}` + (app.comment ? `\nКомментарий: ${app.comment}` : ''),
+        item: (app) => `Заявка #${app.id}\nФИО: ${app.guest_name}\nДата: ${formatDateRU(app.visit_date)}\nСтатус: ${app.status}` + (app.comment ? `\nКомментарий: ${app.comment}` : ''),
         searchPrompt: 'Введите номер заявки для поиска:',
         searchButton: 'Найти по номеру',
         
@@ -89,7 +99,7 @@ const ui = {
 
         correctionPrompt: 'Что именно нужно уточнить? Введите текст сообщения для пользователя:',
         
-        newAppNotification: (app) => `Новая заявка #${app.id}!\nФИО: ${app.guest_name}\nДата: ${app.visit_date.toLocaleDateString('ru-RU')}\nЗона: ${app.zone}\nЦель: ${app.purpose || 'не указана'}`,
+        newAppNotification: (app) => `Новая заявка #${app.id}!\nФИО: ${app.guest_name}\nДата: ${formatDateRU(app.visit_date)}\nЗона: ${app.zone}\nЦель: ${app.purpose || 'не указана'}`,
         notificationKeyboard: (appId) => Keyboard.inlineKeyboard([[Keyboard.button.callback('Изменить статус', `view_app:${appId}`)]]),
 
         paginationKeyboard: (offset, total, role = 'admin') => {
@@ -147,7 +157,7 @@ const ui = {
         ]),
         referralTitle: 'Управление Referral-ссылками:',
         referralEmpty: 'Ссылок пока нет.',
-        referralItem: (link) => `Комментарий: *${link.comment || 'нет'}*\nКод: \`${link.code}\` (https://max.ru/spring_cat47_bot?start=\`${link.code}\`)\nДата: ${link.visit_date ? link.visit_date.toLocaleDateString('ru-RU') : 'не задана'}\nВремя: ${link.visit_time || 'не задано'}\nЗона: ${link.zone || 'не задана'}\nЦель: ${link.purpose || 'не задана'}\nСтатус: *${link.status}*`,
+        referralItem: (link) => `Комментарий: *${link.comment || 'нет'}*\nКод: \`${link.code}\` (https://max.ru/spring_cat47_bot?start=\`${link.code}\`)\nДата: ${formatDateRU(link.visit_date)}\nВремя: ${link.visit_time || 'не задано'}\nЗона: ${link.zone || 'не задана'}\nЦель: ${link.purpose || 'не задана'}\nСтатус: *${link.status}*`,
         deleteReferralCallback: (code) => `del_ref:${code}`,
         editReferralCallback: (code) => `edit_ref:${code}`,
         createReferralButton: 'Создать ссылку',
@@ -172,7 +182,7 @@ const ui = {
     myApplications: {
         title: (from, to, total) => `Показаны ваши заявки ${from}-${to} из ${total}:`,
         empty: 'У вас пока нет поданных заявок.',
-        item: (app) => `Заявка #${app.id}\nГость: ${app.guest_name}\nДата: ${app.visit_date.toLocaleDateString('ru-RU')}\nСтатус: *${app.status}*` + (app.comment ? `\nКомментарий: ${app.comment}` : ''),
+        item: (app) => `Заявка #${app.id}\nГость: ${app.guest_name}\nДата: ${formatDateRU(app.visit_date)}\nСтатус: *${app.status}*` + (app.comment ? `\nКомментарий: ${app.comment}` : ''),
         cancelButton: (id) => `Отменить #${id}`,
         refillButton: (id) => `Перезаполнить #${id}`,
         cancelCallback: (id) => `cancel_app:${id}`,

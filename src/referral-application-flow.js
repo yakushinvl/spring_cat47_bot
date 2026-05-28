@@ -20,6 +20,13 @@ const parseDate = (isoStr) => {
     return new Date(y, m - 1, d);
 };
 
+const formatDateRU = (isoStr) => {
+    if (!isoStr) return 'не указана';
+    if (isoStr.includes('.')) return isoStr;
+    const [y, m, d] = isoStr.split('-').map(Number);
+    return `${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}.${y}`;
+};
+
 const refAppFlow = {
     async askDate(ctx, userId) {
         const today = new Date();
@@ -46,8 +53,8 @@ const refAppFlow = {
         }
 
         if (state?.data?.visit_date) {
-            const curD = parseDate(state.data.visit_date);
-            buttons.unshift(ui.application.currentValueButton(curD.toLocaleDateString('ru-RU'), 'Оставить дату'));
+            const displayDate = formatDateRU(state.data.visit_date);
+            buttons.unshift(ui.application.currentValueButton(displayDate, 'Оставить дату'));
         }
 
         await ctx.sendOrEdit(ui.application.date, { attachments: [ui.application.cancelKeyboard(buttons)] });

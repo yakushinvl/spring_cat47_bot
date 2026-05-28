@@ -31,6 +31,13 @@ const parseDate = (isoStr) => {
     return new Date(y, m - 1, d);
 };
 
+const formatDateRU = (isoStr) => {
+    if (!isoStr || isoStr === 'не задана') return 'не задана';
+    if (isoStr.includes('.')) return isoStr;
+    const [y, m, d] = isoStr.split('-').map(Number);
+    return `${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}.${y}`;
+};
+
 const referralFlow = {
     async start(ctx, refCode = null) {
         const userId = ctx.user.user_id;
@@ -42,10 +49,11 @@ const referralFlow = {
             const res = await pool.query('SELECT * FROM referral_links WHERE code = $1', [refCode]);
             const ref = res.rows[0];
             if (ref) {
+                const visit_date = ref.visit_date instanceof Date ? formatDate(ref.visit_date) : ref.visit_date;
                 existingData = {
                     ...existingData,
                     comment: ref.comment,
-                    visit_date: ref.visit_date ? formatDate(ref.visit_date) : null,
+                    visit_date: visit_date,
                     visit_time: ref.visit_time,
                     zone: ref.zone,
                     purpose: ref.purpose
@@ -87,8 +95,8 @@ const referralFlow = {
         const buttons = dates.map(d => [Keyboard.button.callback(d.toLocaleDateString('ru-RU'), `ref_set_date:${formatDate(d)}`)]);
         
         if (state?.data?.visit_date) {
-            const curD = parseDate(state.data.visit_date);
-            buttons.unshift(ui.application.currentValueButton(curD.toLocaleDateString('ru-RU'), 'Оставить дату'));
+            const displayDate = formatDateRU(state.data.visit_date);
+            buttons.unshift(ui.application.currentValueButton(displayDate, 'Оставить дату'));
         }
 
         await ctx.sendOrEdit(ui.settings.refStepDate, { attachments: [ui.application.cancelKeyboard(buttons)] });
@@ -156,7 +164,7 @@ const referralFlow = {
         const summary = `Параметры новой ссылки:\n\n` +
             `Комментарий: ${data.comment}\n` +
             `Код: \`${data.code}\`\n` +
-            `Дата: ${data.visit_date || 'не выбрана'}\n` +
+            `Дата: ${formatDateRU(data.visit_date)}\n` +
             `Время: ${data.visit_time || 'не выбрано'}\n` +
             `Зона: ${data.zone || 'не выбрана'}\n` +
             `Цель: ${data.purpose || 'не выбрана'}`;
